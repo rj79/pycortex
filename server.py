@@ -7,14 +7,21 @@ logging.basicConfig()
 logger = logging.getLogger("pycortex")
 logger.setLevel(logging.INFO)
 
-DEFAULT_TIMEOUT = 3600
-MAX_TIMEOUT = 86400
+class TimeSource:
+    def get_time(self):
+        return time.time()
 
-cache = {}
+_cache = {}
+_entry_limit = 4096
+_time_source = TimeSource()
 
 def clear_cache():
-    global cache
-    cache = {}
+    global _cache
+    _cache = {}
+
+def set_entry_limit(limit):
+    global _entry_limit
+    _entry_limit = limit
 
 def server_factory(codec):
     def create():
@@ -25,8 +32,13 @@ def server_factory(codec):
 class Entry:
     def __init__(self, value):
         self.value = value
-        self.last_access = time.time()
+        self.touch()
 
+    def touch(self):
+        self.last_access = _time_source.get_time()
+
+    def __repr__(self):
+        return '<Entry value="%s" last_access=%d>' % (self.value, self.last_access)
 
 class Server(asyncio.Protocol):
     def __init__(self, codec):
@@ -43,19 +55,34 @@ class Server(asyncio.Protocol):
         request = self._codec.decode_request(data)
         if request.method == "GET":
             try:
-                entry = cache[request.key]
+                entry = _cache[request.key]
             except KeyError:
                 # Cache miss
                 self._transport.write(self._codec.encode_response(None, True))
             else:
                 # Cache hit
+                entry.touch()
                 self._transport.write(self._codec.encode_response(entry.value, False))
         elif request.method == "SET":
-            cache[request.key] = Entry(request.value)
+            _cache[request.key] = Entry(request.value)
+            if len(_cache) > _entry_limit:
+                self.discard_oldest()
             self._transport.write(self._codec.encode_response(None, False))
         else:
             logger.warning('Unknown method "%s" from client' % (request.method))
 
+
+    def discard_oldest(self):
+        # TODO: This search is linear and slow once the limit is reached.
+        # It might be better to consider an ordered set/heap where the
+        # amortied cost of keeping it ordered is lower.
+        oldest_time = _time_source.get_time()
+        oldest_key = None
+        for key, entry in _cache.items():
+            if entry.last_access < oldest_time:
+                oldest_time = entry.last_access
+                oldest_key = key
+        del _cache[oldest_key]
 
 def start(loop, codec, host='0.0.0.0', port=1234):
 

@@ -1,6 +1,17 @@
 import unittest
 import server
 import protocodecs
+import time
+
+class MockTimeSource:
+    def __init__(self):
+        self.time = 0
+
+    def get_time(self):
+        return self.time
+
+    def advance(self):
+        self.time += 1
 
 class MockTransport:
     def __init__(self):
@@ -61,3 +72,61 @@ class TestServer(unittest.TestCase):
     def test_no_response_if_unknown_method(self):
         self.server.data_received(b'{"m":"hack", "k":"attempt"}')
         self.assertEqual(None, self.transport.read())
+
+    def test_remove_oldest_entry_when_entry_limit_reached(self):
+        server.set_entry_limit(2)
+        time_source = MockTimeSource()
+        server._time_source = time_source
+
+        self.server.data_received(self.codec.encode_set("key1", "value1"))
+        time_source.advance()
+        self.server.data_received(self.codec.encode_set("key2", "value2"))
+        time_source.advance()
+        # This should push key2 out of the cache since the limit is reached
+        self.server.data_received(self.codec.encode_set("key3", "value3"))
+        self.server.data_received(self.codec.encode_get("key1"))
+        response1 = self.codec.decode_response(self.transport.read())
+        self.server.data_received(self.codec.encode_get("key2"))
+        response2 = self.codec.decode_response(self.transport.read())
+        self.server.data_received(self.codec.encode_get("key3"))
+        response3 = self.codec.decode_response(self.transport.read())
+
+        self.assertTrue(response1.error)
+        self.assertEqual(None, response1.value)
+
+        self.assertFalse(response2.error)
+        self.assertEqual("value2", response2.value)
+
+        self.assertFalse(response3.error)
+        self.assertEqual("value3", response3.value)
+
+    def test_get_updates_last_access_time(self):
+        server.set_entry_limit(2)
+        time_source = MockTimeSource()
+        server._time_source = time_source
+
+        self.server.data_received(self.codec.encode_set("key1", "value1"))
+        time_source.advance()
+        self.server.data_received(self.codec.encode_set("key2", "value2"))
+        # Accessing key1 makes key2 the oldest accessed
+        time_source.advance()
+        self.server.data_received(self.codec.encode_get("key1"))
+        time_source.advance()
+        # This should push key2 out of the cache
+        self.server.data_received(self.codec.encode_set("key3", "value3"))
+
+        self.server.data_received(self.codec.encode_get("key1"))
+        response1 = self.codec.decode_response(self.transport.read())
+        self.server.data_received(self.codec.encode_get("key2"))
+        response2 = self.codec.decode_response(self.transport.read())
+        self.server.data_received(self.codec.encode_get("key3"))
+        response3 = self.codec.decode_response(self.transport.read())
+
+        self.assertFalse(response1.error)
+        self.assertEqual("value1", response1.value)
+
+        self.assertTrue(response2.error)
+        self.assertEqual(None, response2.value)
+
+        self.assertFalse(response3.error)
+        self.assertEqual("value3", response3.value)
