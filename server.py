@@ -11,6 +11,10 @@ MAX_TIMEOUT = 86400
 
 cache = {}
 
+def clear_cache():
+    global cache
+    cache = {}
+
 def server_factory(codec):
     def create():
         return Server(codec)
