@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import time
 from protocodecs import SimpleJsonCodec
 
 logging.basicConfig()
@@ -20,10 +21,11 @@ def server_factory(codec):
         return Server(codec)
     return create
 
+
 class Entry:
-    def __init__(self):
-        self._value = None
-        self._last_access = None
+    def __init__(self, value):
+        self.value = value
+        self.last_access = time.time()
 
 
 class Server(asyncio.Protocol):
@@ -41,15 +43,15 @@ class Server(asyncio.Protocol):
         request = self._codec.decode_request(data)
         if request.method == "GET":
             try:
-                value = cache[request.key]
+                entry = cache[request.key]
             except KeyError:
                 # Cache miss
                 self._transport.write(self._codec.encode_response(None, True))
             else:
                 # Cache hit
-                self._transport.write(self._codec.encode_response(value, False))
+                self._transport.write(self._codec.encode_response(entry.value, False))
         elif request.method == "SET":
-            cache[request.key] = request.value
+            cache[request.key] = Entry(request.value)
             self._transport.write(self._codec.encode_response(None, False))
         else:
             logger.warning('Unknown method "%s" from client' % (request.method))
