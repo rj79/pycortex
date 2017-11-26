@@ -37,9 +37,9 @@ Clear: {"m": "CLEAR"}
 
 Responses
 =========
-Hit: (Get           {"v": <value>, "e": False}
+Hit (Get): {"v": <value>, "e": False}
 Miss (Get, Delete): {"v": None, "e": True}
-Ack (Set, Delete):  {"v": None, "e": False}
+Ack (Set, Evict, Clear): {"v": None, "e": False}
 """
 class SimpleJsonCodec:
     def _check_key(self, key):
