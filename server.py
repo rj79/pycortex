@@ -58,6 +58,7 @@ class Server(asyncio.Protocol):
         pass
 
     def data_received(self, data):
+        global _cache
         request = self._codec.decode_request(data)
         if request.method == "GET":
             try:
@@ -81,6 +82,9 @@ class Server(asyncio.Protocol):
                 self._return_error()
             else:
                 self._return_ack()
+        elif request.method == "CLEAR":
+            _cache = {}
+            self._return_ack()
         else:
             logger.warning('Unknown method "%s" from client' % (request.method))
 

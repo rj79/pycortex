@@ -36,6 +36,22 @@ class Client(asyncio.Protocol):
             return result.value
         raise KeyError('Key "%s" not found' % (key))
 
+    def evict(self, key):
+        self._transport.write(self._codec.encode_evict(key))
+        self._request = asyncio.Future()
+        asyncio.ensure_future(self._request)
+        self._loop.run_until_complete(self._request)
+        result = self._request.result()
+        if result.is_error():
+            raise KeyError('Key "%s" not found' % (key))
+
+    def clear(self):
+        self._transport.write(self._codec.encode_clear())
+        self._request = asyncio.Future()
+        asyncio.ensure_future(self._request)
+        self._loop.run_until_complete(self._request)
+
+
 def client_factory(loop, codec):
     def create():
         return Client(loop, codec)
@@ -44,6 +60,8 @@ def client_factory(loop, codec):
 def print_usage():
     print("Usage: client set <key> <value>")
     print("       client get <key>")
+    print("       client evict <key>")
+    print("       client clear")
 
 def main(args):
     loop = asyncio.get_event_loop()
@@ -78,6 +96,17 @@ def main(args):
             print(client.get(key))
         except KeyError:
             pass
+    elif cmd == "evict":
+        if len(args) < 2:
+            print_usage()
+            return False
+        key = args[1]
+        try:
+            client.evict(key)
+        except KeyError:
+            pass
+    elif cmd == "clear":
+        client.clear()
     else:
         print('Unknown command %s' % (cmd))
         return False

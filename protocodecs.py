@@ -48,7 +48,7 @@ class SimpleJsonCodec:
         if not key.isalnum():
             raise ValueError('Key must be alphanumeric.')
 
-    def _encode_request(self, method, key, value=None):
+    def _encode_request(self, method, key=None, value=None):
         self._check_key(key)
         if value:
             return bytes(json.dumps({'m': method, 'k': key, "v": value}), 'utf-8')
@@ -74,6 +74,10 @@ class SimpleJsonCodec:
     def encode_evict(self, key):
         self._check_key(key)
         return self._encode_request('EVICT', key)
+
+    """ Used by client """
+    def encode_clear(self):
+        return self._encode_request('CLEAR', 'all')
 
     """ Used by client """
     def decode_response(self, data):

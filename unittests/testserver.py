@@ -137,3 +137,36 @@ class TestServer(unittest.TestCase):
         response = self.codec.decode_response(self.transport.read())
         self.assertTrue(response.error)
         self.assertEqual(None, response.value)
+
+    def test_09_get_key_returns_miss_after_evict(self):
+        self.server.data_received(self.codec.encode_set("foo", "bar"))
+        self.server.data_received(self.codec.encode_evict("foo"))
+
+        response = self.codec.decode_response(self.transport.read())
+        self.assertFalse(response.error)
+        self.assertEqual(None, response.value)
+
+        self.server.data_received(self.codec.encode_get("foo"))
+
+        response = self.codec.decode_response(self.transport.read())
+        self.assertTrue(response.error)
+        self.assertEqual(None, response.value)
+
+    def test_08_no_values_after_clear(self):
+        self.server.data_received(self.codec.encode_set("foo", "bar"))
+        self.server.data_received(self.codec.encode_set("baz", "zok"))
+        self.server.data_received(self.codec.encode_clear())
+
+        response = self.codec.decode_response(self.transport.read())
+        self.assertFalse(response.error)
+        self.assertEqual(None, response.value)
+
+        self.server.data_received(self.codec.encode_get("foo"))
+        response = self.codec.decode_response(self.transport.read())
+        self.assertTrue(response.error)
+        self.assertEqual(None, response.value)
+
+        self.server.data_received(self.codec.encode_get("baz"))
+        response = self.codec.decode_response(self.transport.read())
+        self.assertTrue(response.error)
+        self.assertEqual(None, response.value)
