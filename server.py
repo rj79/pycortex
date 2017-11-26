@@ -45,6 +45,12 @@ class Server(asyncio.Protocol):
         self._codec = codec
         self._transport = None
 
+    def _return_error(self):
+        self._transport.write(self._codec.encode_response(None, True))
+
+    def _return_ack(self):
+        self._transport.write(self._codec.encode_response(None, False))
+
     def connection_made(self, transport):
         self._transport = transport
 
@@ -58,7 +64,7 @@ class Server(asyncio.Protocol):
                 entry = _cache[request.key]
             except KeyError:
                 # Cache miss
-                self._transport.write(self._codec.encode_response(None, True))
+                self._return_error()
             else:
                 # Cache hit
                 entry.touch()
@@ -67,7 +73,14 @@ class Server(asyncio.Protocol):
             _cache[request.key] = Entry(request.value)
             if len(_cache) > _entry_limit:
                 self.discard_oldest()
-            self._transport.write(self._codec.encode_response(None, False))
+            self._return_ack()
+        elif request.method == "EVICT":
+            try:
+                del _cache[request.key]
+            except KeyError:
+                self._return_error()
+            else:
+                self._return_ack()
         else:
             logger.warning('Unknown method "%s" from client' % (request.method))
 

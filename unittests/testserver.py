@@ -31,21 +31,21 @@ class TestServer(unittest.TestCase):
         self.server = server.Server(self.codec)
         self.server.connection_made(self.transport)
 
-    def test_get_uncached_key_returns_miss(self):
+    def test_01_get_uncached_key_returns_miss(self):
         self.server.data_received(self.codec.encode_get("foo"))
 
         response = self.codec.decode_response(self.transport.read())
         self.assertTrue(response.error)
         self.assertEqual(None, response.value)
 
-    def test_set_value_gives_ack(self):
+    def test_02_set_value_gives_ack(self):
         self.server.data_received(self.codec.encode_set("foo", "bar"))
 
         response = self.codec.decode_response(self.transport.read())
         self.assertFalse(response.error)
         self.assertEqual(None, response.value)
 
-    def test_get_after_set_returns_value(self):
+    def test_03_get_after_set_returns_value(self):
         self.server.data_received(self.codec.encode_set("foo", "bar"))
         self.server.data_received(self.codec.encode_get("foo"))
 
@@ -53,7 +53,7 @@ class TestServer(unittest.TestCase):
         self.assertFalse(response.error)
         self.assertEqual("bar", response.value)
 
-    def test_server_objects_share_cache(self):
+    def test_04_server_objects_share_cache(self):
         # Set up another server object in addition to the one in setUp
         transport = MockTransport()
         codec = protocodecs.SimpleJsonCodec()
@@ -69,11 +69,11 @@ class TestServer(unittest.TestCase):
         self.assertFalse(response.error)
         self.assertEqual("bar", response.value)
 
-    def test_no_response_if_unknown_method(self):
+    def test_05_no_response_if_unknown_method(self):
         self.server.data_received(b'{"m":"hack", "k":"attempt"}')
         self.assertEqual(None, self.transport.read())
 
-    def test_remove_oldest_entry_when_entry_limit_reached(self):
+    def test_06_remove_oldest_entry_when_entry_limit_reached(self):
         server.set_entry_limit(2)
         time_source = MockTimeSource()
         server._time_source = time_source
@@ -100,7 +100,7 @@ class TestServer(unittest.TestCase):
         self.assertFalse(response3.error)
         self.assertEqual("value3", response3.value)
 
-    def test_get_updates_last_access_time(self):
+    def test_07_get_updates_last_access_time(self):
         server.set_entry_limit(2)
         time_source = MockTimeSource()
         server._time_source = time_source
@@ -130,3 +130,10 @@ class TestServer(unittest.TestCase):
 
         self.assertFalse(response3.error)
         self.assertEqual("value3", response3.value)
+
+    def test_08_evict_non_existing_returns_error(self):
+        self.server.data_received(self.codec.encode_evict("foo"))
+
+        response = self.codec.decode_response(self.transport.read())
+        self.assertTrue(response.error)
+        self.assertEqual(None, response.value)

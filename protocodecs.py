@@ -71,6 +71,11 @@ class SimpleJsonCodec:
         return self._encode_request('GET', key)
 
     """ Used by client """
+    def encode_evict(self, key):
+        self._check_key(key)
+        return self._encode_request('EVICT', key)
+
+    """ Used by client """
     def decode_response(self, data):
         data = data.decode('utf-8')
         j = json.loads(data)
