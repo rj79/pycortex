@@ -30,7 +30,7 @@ Keys and values are interpreted as utf-8 strings and keys must be alphanumerical
 
 Requests
 ========
-Set: {"m": "SET", "k": <key>, "v": value}
+Set: {"m": "SET", "k": <key>, "v": <value>}
 Get: {"m": "GET", "k": <key>}
 Evict: {"m": "EVICT", "k": <key>}
 Clear: {"m": "CLEAR"}
@@ -38,7 +38,7 @@ Clear: {"m": "CLEAR"}
 Responses
 =========
 Hit (Get): {"v": <value>, "e": False}
-Miss (Get, Delete): {"v": None, "e": True}
+Error (Get, Evict): {"v": None, "e": True}
 Ack (Set, Evict, Clear): {"v": None, "e": False}
 """
 class SimpleJsonCodec:
@@ -48,21 +48,20 @@ class SimpleJsonCodec:
         if not key.isalnum():
             raise ValueError('Key must be alphanumeric.')
 
-    def _encode_request(self, method, key=None, value=None):
-        self._check_key(key)
+    def _encode_request(self, method, key=None, value=None, check_key=True):
+        request = {"m": method}
+        if key:
+            self._check_key(key)
+            request["k"] = key
         if value:
-            return bytes(json.dumps({'m': method, 'k': key, "v": value}), 'utf-8')
-        return bytes(json.dumps({'m': method, 'k': key}), 'utf-8')
+            request["v"] = value
+        return bytes(json.dumps(request), 'utf-8')
 
     """ Used by client """
     def encode_set(self, key, value):
         self._check_key(key)
         if not (type(value) is str):
             raise TypeError("Value must be of type str.")
-        #if timeout is not None:
-        #    if (not type(timeout) is int):
-        #        raise TypeError("Timeout must be of type int.")
-
         return self._encode_request('SET', key, value)
 
     """ Used by client """
@@ -77,7 +76,7 @@ class SimpleJsonCodec:
 
     """ Used by client """
     def encode_clear(self):
-        return self._encode_request('CLEAR', 'all')
+        return self._encode_request('CLEAR')
 
     """ Used by client """
     def decode_response(self, data):
@@ -90,7 +89,8 @@ class SimpleJsonCodec:
     def decode_request(self, data):
         data = data.decode('utf-8')
         j = json.loads(data)
-        self._check_key(j["k"])
+        if j["m"] != "CLEAR":
+            self._check_key(j["k"])
 
         if not "k" in j:
             key = None
