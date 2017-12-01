@@ -2,6 +2,22 @@ import asyncio
 from protocodecs import SimpleJsonCodec
 import sys
 
+def connection(host, port):
+    return ClientContext(host, port)
+
+class ClientContext:
+    def __init__(self, host, port):
+        self._host = host
+        self._port = port
+        self._client = None
+
+    def __enter__(self):
+        self._client = connect(self._host, self._port)
+        return self._client
+
+    def __exit__(self, type, value, traceback):
+        self._client.close()
+
 class Client(asyncio.Protocol):
     def __init__(self, loop, codec):
         self._loop = loop
@@ -12,8 +28,12 @@ class Client(asyncio.Protocol):
     def connection_made(self, transport):
         self._transport = transport
 
+    def close(self):
+        if self._transport is not None:
+            self._transport.close()
+
     def connection_lost(self, reason):
-        print("connection lost due to", reason)
+        #print("connection lost due to", reason)
         if self._request:
             self._request.cancel()
 
@@ -57,6 +77,19 @@ def client_factory(loop, codec):
         return Client(loop, codec)
     return create
 
+def connect(host, port):
+    loop = asyncio.get_event_loop()
+    codec = SimpleJsonCodec()
+
+    connect_coro = loop.create_connection(client_factory(loop, codec), host, port)
+
+    try:
+        transport, client = loop.run_until_complete(connect_coro)
+    except ConnectionRefusedError:
+        print("Connection refused")
+        return None
+    return client
+
 def print_usage():
     print("Usage: client set <key> <value>")
     print("       client get <key>")
@@ -64,15 +97,8 @@ def print_usage():
     print("       client clear")
 
 def main(args):
-    loop = asyncio.get_event_loop()
-    codec = SimpleJsonCodec()
-
-    connect_coro = loop.create_connection(client_factory(loop, codec), '127.0.0.1', 1234)
-
-    try:
-        transport, client = loop.run_until_complete(connect_coro)
-    except ConnectionRefusedError:
-        print("Connection refused")
+    client = connect('127.0.0.1', 1234)
+    if not client:
         return False
 
     if len(args) < 1:

@@ -88,7 +88,6 @@ class Server(asyncio.Protocol):
         else:
             logger.warning('Unknown method "%s" from client' % (request.method))
 
-
     def discard_oldest(self):
         # TODO: This search is linear and slow once the limit is reached.
         # It might be better to consider an ordered set/heap where the
