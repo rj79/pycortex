@@ -2,6 +2,9 @@ import unittest
 import server
 import protocodecs
 import time
+import logging
+
+server.logger.setLevel(logging.CRITICAL)
 
 class MockTimeSource:
     def __init__(self):
