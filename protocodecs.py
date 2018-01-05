@@ -13,7 +13,7 @@ class Response:
         self.error = error
 
     def is_hit(self):
-        return (self.value is not None) and (self.error == False)
+        return (self.value is not None) and (self.error is False)
 
     def get_value(self):
         return self.value
@@ -22,11 +22,13 @@ class Response:
         return self.error
 
     def is_ack(self):
-        return (self.value is None) and (self.error == False)
+        return (self.value is None) and (self.error is False)
+
 
 """
 A very simple cache protocol.
-Keys and values are interpreted as utf-8 strings and keys must be alphanumerical.
+Keys and values are interpreted as utf-8 strings and keys must be
+alphanumerical.
 
 Requests
 ========

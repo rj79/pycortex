@@ -33,7 +33,6 @@ class Client(asyncio.Protocol):
             self._transport.close()
 
     def connection_lost(self, reason):
-        #print("connection lost due to", reason)
         if self._request:
             self._request.cancel()
 
@@ -81,7 +80,8 @@ def connect(host, port):
     loop = asyncio.get_event_loop()
     codec = SimpleJsonCodec()
 
-    connect_coro = loop.create_connection(client_factory(loop, codec), host, port)
+    connect_coro = loop.create_connection(client_factory(loop, codec), host,
+                                          port)
 
     try:
         transport, client = loop.run_until_complete(connect_coro)
@@ -137,6 +137,7 @@ def main(args):
         print('Unknown command %s' % (cmd))
         return False
     return True
+
 
 if __name__ == '__main__':
     if not main(sys.argv[1:]):

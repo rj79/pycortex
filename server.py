@@ -11,6 +11,7 @@ class TimeSource:
     def get_time(self):
         return time.time()
 
+
 _cache = {}
 _entry_limit = 4096
 _time_source = TimeSource()
@@ -28,7 +29,6 @@ def server_factory(codec):
         return Server(codec)
     return create
 
-
 class Entry:
     def __init__(self, value):
         self.value = value
@@ -38,7 +38,9 @@ class Entry:
         self.last_access = _time_source.get_time()
 
     def __repr__(self):
-        return '<Entry value="%s" last_access=%d>' % (self.value, self.last_access)
+        return '<Entry value="%s" last_access=%d>' % \
+            (self.value, self.last_access)
+
 
 class Server(asyncio.Protocol):
     def __init__(self, codec):
@@ -69,7 +71,8 @@ class Server(asyncio.Protocol):
             else:
                 # Cache hit
                 entry.touch()
-                self._transport.write(self._codec.encode_response(entry.value, False))
+                self._transport.write(self._codec.encode_response(entry.value,
+                                      False))
         elif request.method == "SET":
             _cache[request.key] = Entry(request.value)
             if len(_cache) > _entry_limit:
@@ -86,7 +89,8 @@ class Server(asyncio.Protocol):
             _cache = {}
             self._return_ack()
         else:
-            logger.warning('Unknown method "%s" from client' % (request.method))
+            logger.warning('Unknown method "%s" from client' %
+                           (request.method))
 
     def discard_oldest(self):
         # TODO: This search is linear and slow once the limit is reached.
@@ -100,9 +104,10 @@ class Server(asyncio.Protocol):
                 oldest_key = key
         del _cache[oldest_key]
 
+
 def start(loop, codec, host='0.0.0.0', port=1234):
 
-    start_coro = loop.create_server(server_factory(codec) , host, port)
+    start_coro = loop.create_server(server_factory(codec), host, port)
 
     server = loop.run_until_complete(start_coro)
     logger.info("Serving on %s:%d", host, port)
@@ -118,5 +123,5 @@ def start(loop, codec, host='0.0.0.0', port=1234):
 
 
 if __name__ == '__main__':
-    loop = asyncio.get_event_loop();
+    loop = asyncio.get_event_loop()
     start(loop, SimpleJsonCodec())
