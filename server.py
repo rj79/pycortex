@@ -44,9 +44,10 @@ class Server(asyncio.Protocol):
         self._codec = codec
         self._transport = None
         try:
-            self._entry_limit = int(os.environ['PYCORTEX_ENTRY_LIMIT'])
+            limit = int(os.environ['PYCORTEX_ENTRY_LIMIT'])
         except (KeyError, ValueError):
-            self._entry_limit = DEFAULT_ENTRY_LIMIT
+            limit = DEFAULT_ENTRY_LIMIT
+        self.set_entry_limit(limit)
 
     def _return_error(self):
         self._transport.write(self._codec.encode_response(None, True))
@@ -94,6 +95,8 @@ class Server(asyncio.Protocol):
                            (request.method))
 
     def set_entry_limit(self, limit):
+        if limit < 1:
+            return
         while len(_cache) > limit:
             discard_oldest()
         self._entry_limit = limit
