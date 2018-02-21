@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 import time
 from protocodecs import SimpleJsonCodec
 
@@ -13,16 +14,12 @@ class TimeSource:
 
 
 _cache = {}
-_entry_limit = 4096
 _time_source = TimeSource()
+DEFAULT_ENTRY_LIMIT = 4096
 
 def clear_cache():
     global _cache
     _cache = {}
-
-def set_entry_limit(limit):
-    global _entry_limit
-    _entry_limit = limit
 
 def server_factory(codec):
     def create():
@@ -46,6 +43,10 @@ class Server(asyncio.Protocol):
     def __init__(self, codec):
         self._codec = codec
         self._transport = None
+        try:
+            self._entry_limit = int(os.environ['PYCORTEX_ENTRY_LIMIT'])
+        except (KeyError, ValueError):
+            self._entry_limit = DEFAULT_ENTRY_LIMIT
 
     def _return_error(self):
         self._transport.write(self._codec.encode_response(None, True))
@@ -75,7 +76,7 @@ class Server(asyncio.Protocol):
                                       False))
         elif request.method == "SET":
             _cache[request.key] = Entry(request.value)
-            if len(_cache) > _entry_limit:
+            if len(_cache) > self._entry_limit:
                 self.discard_oldest()
             self._return_ack()
         elif request.method == "EVICT":
@@ -92,6 +93,11 @@ class Server(asyncio.Protocol):
             logger.warning('Unknown method "%s" from client' %
                            (request.method))
 
+    def set_entry_limit(self, limit):
+        while len(_cache) > limit:
+            discard_oldest()
+        self._entry_limit = limit
+
     def discard_oldest(self):
         # TODO: This search is linear and slow once the limit is reached.
         # It might be better to consider an ordered set/heap where the
@@ -106,7 +112,6 @@ class Server(asyncio.Protocol):
 
 
 def start(loop, codec, host='0.0.0.0', port=1234):
-
     start_coro = loop.create_server(server_factory(codec), host, port)
 
     server = loop.run_until_complete(start_coro)

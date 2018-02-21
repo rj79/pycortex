@@ -1,5 +1,6 @@
 import unittest
 import server
+import os
 import protocodecs
 import time
 import logging
@@ -77,7 +78,7 @@ class TestServer(unittest.TestCase):
         self.assertEqual(None, self.transport.read())
 
     def test_06_remove_oldest_entry_when_entry_limit_reached(self):
-        server.set_entry_limit(2)
+        self.server.set_entry_limit(2)
         time_source = MockTimeSource()
         server._time_source = time_source
 
@@ -85,7 +86,7 @@ class TestServer(unittest.TestCase):
         time_source.advance()
         self.server.data_received(self.codec.encode_set("key2", "value2"))
         time_source.advance()
-        # This should push key2 out of the cache since the limit is reached
+        # This should push key1 out of the cache since the limit is reached
         self.server.data_received(self.codec.encode_set("key3", "value3"))
         self.server.data_received(self.codec.encode_get("key1"))
         response1 = self.codec.decode_response(self.transport.read())
@@ -104,7 +105,7 @@ class TestServer(unittest.TestCase):
         self.assertEqual("value3", response3.value)
 
     def test_07_get_updates_last_access_time(self):
-        server.set_entry_limit(2)
+        self.server.set_entry_limit(2)
         time_source = MockTimeSource()
         server._time_source = time_source
 
@@ -155,7 +156,7 @@ class TestServer(unittest.TestCase):
         self.assertTrue(response.error)
         self.assertEqual(None, response.value)
 
-    def test_08_no_values_after_clear(self):
+    def test_10_no_values_after_clear(self):
         self.server.data_received(self.codec.encode_set("foo", "bar"))
         self.server.data_received(self.codec.encode_set("baz", "zok"))
         self.server.data_received(self.codec.encode_clear())
@@ -173,3 +174,46 @@ class TestServer(unittest.TestCase):
         response = self.codec.decode_response(self.transport.read())
         self.assertTrue(response.error)
         self.assertEqual(None, response.value)
+
+    def test_11_can_set_entry_limit_with_environment_varialbe(self):
+        os.environ['PYCORTEX_ENTRY_LIMIT'] = '2'
+
+        # Re-create server so that environment variable can be taken into
+        # account
+        self.server = server.Server(self.codec)
+        self.server.connection_made(self.transport)
+
+        time_source = MockTimeSource()
+        server._time_source = time_source
+
+        self.server.data_received(self.codec.encode_set("key1", "value1"))
+        time_source.advance()
+        self.server.data_received(self.codec.encode_set("key2", "value2"))
+        time_source.advance()
+        # This should push key1 out of the cache since the limit is reached
+        self.server.data_received(self.codec.encode_set("key3", "value3"))
+        self.server.data_received(self.codec.encode_get("key1"))
+        response1 = self.codec.decode_response(self.transport.read())
+        self.server.data_received(self.codec.encode_get("key2"))
+        response2 = self.codec.decode_response(self.transport.read())
+        self.server.data_received(self.codec.encode_get("key3"))
+        response3 = self.codec.decode_response(self.transport.read())
+
+        self.assertTrue(response1.error)
+        self.assertEqual(None, response1.value)
+
+        self.assertFalse(response2.error)
+        self.assertEqual("value2", response2.value)
+
+        self.assertFalse(response3.error)
+        self.assertEqual("value3", response3.value)
+
+    def test_12_no_crash_if_environment_variable_invalid(self):
+        os.environ['PYCORTEX_ENTRY_LIMIT'] = 'not_an_integer'
+
+        # Re-create server so that environment variable can be taken into
+        # account
+        try:
+            self.server = server.Server(self.codec)
+        except:
+            self.assertFalse(True)
