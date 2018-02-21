@@ -1,6 +1,6 @@
 # About
 Pycortex is a very simple caching server. It can store string key/value
-pairs. Both the server and the client library is built using asyncio.
+pairs. Both the server and the client library are built using asyncio.
 
 # Protocol details
 * Requests and responses are sent as JSON.
@@ -17,3 +17,7 @@ pairs. Both the server and the client library is built using asyncio.
 * Cache hit (Get): {"v": <value>, "e": False}
 * Error (Get, Evict): {"v": None, "e": True}
 * Ack (Set, Evict, Clear): {"v": None, "e": False}
+
+## Configuration
+* It is possible to set the maximum number of entries in the cache by setting
+  the environment variable PYCORTEX_ENTRY_LIMIT to the desired limit.
